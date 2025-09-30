@@ -1,0 +1,210 @@
+# Circuit Documentation
+
+## System Block Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SMART HOME SECURITY SYSTEM                    │
+└─────────────────────────────────────────────────────────────────┘
+
+┌──────────────┐         ┌──────────────┐         ┌──────────────┐
+│  Room 1      │         │  Room 2      │         │  Room 3      │
+│  - Flame     │         │  - Flame     │         │  - Flame     │
+│  - Gas       │         │  - Gas       │         │  - Gas       │
+└──────┬───────┘         └──────┬───────┘         └──────┬───────┘
+       │                        │                        │
+       └────────────────────────┼────────────────────────┘
+                                │
+                         ┌──────▼───────┐
+                         │  4:1 MUX     │
+                         │  (74HC153)   │
+                         └──────┬───────┘
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+             ┌──────▼──────┐         ┌──────▼──────┐
+             │   Clock     │         │   ESP32     │
+             │  Generator  │         │   Main      │
+             │  (CD4047)   │         │  Controller │
+             └──────┬──────┘         └──────┬──────┘
+                    │                       │
+             ┌──────▼──────┐               │
+             │  Counter    │               │
+             │  (74HC191)  │               │
+             └──────┬──────┘               │
+                    │                      │
+                    └──────────────────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+   ┌────▼────┐           ┌─────▼─────┐         ┌──────▼──────┐
+   │  Keypad │           │    LCD    │         │  ESP32-CAM  │
+   │  4x4    │           │   I2C     │         │  (Intruder) │
+   └─────────┘           └───────────┘         └─────────────┘
+        │                       
+   ┌────▼────┐                
+   │  Door   │                
+   │  Lock   │                
+   └─────────┘                
+```
+
+## Central Decoding Circuit
+
+### Clock Generation & Frequency Division
+
+```
+        +5V
+         │
+         ├──[R1 10kΩ]──┐
+         │              │
+    ┌────┴────┐    ┌────┴────┐
+    │ CD4047  │    │   C1    │
+    │ Pin 1   │    │  1µF    │
+    │ Pin 2   ├────┤         │
+    │ Pin 3   │    └────┬────┘
+    │         │         │
+    │  Q(10)  ├─────────┴──────> Clock Output (f)
+    └────┬────┘
+         │
+        GND
+
+Clock Output (f) ──┐
+                   │
+              ┌────▼────┐
+              │ 74HC191 │
+              │ Counter │
+              │   Q0    ├────────> LSB (GPIO 35)
+              │   Q1    ├────────> MSB (GPIO 34)
+              └─────────┘
+```
+
+### Multiplexer Configuration
+
+```
+Room Sensors                    Multiplexer (74HC153)
+                                
+Flame Sensors:             Gas Sensors:
+Room 1 ──────> I0          Room 1 ──────> I0
+Room 2 ──────> I1          Room 2 ──────> I1
+Room 3 ──────> I2          Room 3 ──────> I2
+Room 4 ──────> I3          Room 4 ──────> I3
+                │                          │
+         ┌──────┴──────┐           ┌──────┴──────┐
+         │   MUX A     │           │   MUX B     │
+         │             │           │             │
+    A ───┤ S0  (GPIO34)│      A ───┤ S0  (GPIO34)│
+    B ───┤ S1  (GPIO35)│      B ───┤ S1  (GPIO35)│
+         │             │           │             │
+         │      Y ─────┼───────────┼──> GPIO 13  │
+         └─────────────┘           │      Y ─────┼──> GPIO 14
+                                   └─────────────┘
+
+Truth Table:
+S1(B) | S0(A) | Selected Input
+------|-------|---------------
+  0   |   0   | Room 1 (I0)
+  0   |   1   | Room 2 (I1)
+  1   |   0   | Room 3 (I2)
+  1   |   1   | Room 4 (I3)
+```
+
+## Power Supply Circuit
+
+```
+12V Input ─┬─> Buck Converter ─┬─> 5V  ─┬─> ESP32-CAM
+           │                    │        ├─> Sensors
+           │                    │        ├─> Relay
+           │                    │        └─> LCD Backlight
+           │                    │
+           │                    └─> 3.3V ─┬─> ESP32
+           │                              ├─> Logic ICs
+           │                              └─> I2C Devices
+           │
+           └─> 12V ──> Solenoid Lock (via Relay)
+```
+
+## Sensor Hub Circuit (Per Room)
+
+```
+┌────────────────────────────────────────┐
+│           SENSOR HUB - Room X          │
+├────────────────────────────────────────┤
+│                                        │
+│  Flame Sensor (KY-026)                 │
+│  ┌──────────┐                          │
+│  │  VCC ────┼──> 5V                    │
+│  │  GND ────┼──> GND                   │
+│  │  DO  ────┼──> To MUX Input          │
+│  │  AO  ────┼──> (Not Connected)       │
+│  └──────────┘                          │
+│                                        │
+│  Gas Sensor (MQ-9)                     │
+│  ┌──────────┐                          │
+│  │  VCC ────┼──> 5V                    │
+│  │  GND ────┼──> GND                   │
+│  │  DO  ────┼──> To MUX Input          │
+│  │  AO  ────┼──> (Not Connected)       │
+│  └──────────┘                          │
+│                                        │
+└────────────────────────────────────────┘
+```
+
+## Keypad Interface Circuit
+
+```
+4x4 Matrix Keypad
+
+Rows:               Columns:
+R1 ─── GPIO 18      C1 ─── GPIO 26
+R2 ─── GPIO 19      C2 ─── GPIO 27
+R3 ─── GPIO 23      C3 ─── GPIO 32
+R4 ─── GPIO 25      C4 ─── GPIO 33
+
+Key Layout:
+┌───┬───┬───┬───┐
+│ 1 │ 2 │ 3 │ A │
+├───┼───┼───┼───┤
+│ 4 │ 5 │ 6 │ B │
+├───┼───┼───┼───┤
+│ 7 │ 8 │ 9 │ C │
+├───┼───┼───┼───┤
+│ * │ 0 │ # │ D │
+└───┴───┴───┴───┘
+```
+
+## LCD I2C Interface
+
+```
+LCD Module (16x2 with I2C)
+
+┌─────────────┐
+│  LCD I2C    │
+│             │
+│  VCC ───────┼──> 5V
+│  GND ───────┼──> GND
+│  SDA ───────┼──> GPIO 21
+│  SCL ───────┼──> GPIO 22
+│             │
+└─────────────┘
+
+I2C Address: 0x27 (or 0x3F)
+```
+
+## Door Lock Circuit
+
+```
+ESP32 GPIO 16 ──┬──[1kΩ]──┬──> NPN Transistor Base
+                │          │
+               [10kΩ]      │
+                │          │
+               GND    ┌────▼────┐
+                      │ BC547   │
+                      │Transistor│
+                      └────┬────┘
+                           │
+                      ┌────▼────┐
+                      │  Relay  │
+                      │ Coil    │
+                      ├─────────┤
+                      │   COM───┼──> 12V Supply
+                      │   NO────┼──> Solenoid Lock
