@@ -9,11 +9,11 @@ This project is a Smart Home Security System integrating **gas and fire detectio
 It is built using ESP32, ESP32-CAM, flame and gas sensors, keypad, solenoid lock, LCD, and IoT (Blynk + Google Drive).  
 
 ### Features
-- 🔥 Fire and gas leakage detection with real-time alerts.
-- 🔑 Password-protected door lock system.
-- 📸 Intruder detection via ESP32-CAM (wrong password triggers camera).
-- ☁️ Cloud storage of intruder images using Google Drive.
-- 📱 Remote monitoring and notifications via Blynk app.
+-  Fire and gas leakage detection with real-time alerts.
+- Password-protected door lock system.
+- Intruder detection via ESP32-CAM (wrong password triggers camera).
+- Cloud storage of intruder images using Google Drive.
+- Remote monitoring and notifications via Blynk app.
 
 ## Hardware Components
 - ESP32
