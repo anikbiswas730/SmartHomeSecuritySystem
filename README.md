@@ -1,4 +1,4 @@
-# SmartHomeSecuritySystem
+
 # Smart Home Security System
 EEE-416 Microprocessor and Embedded System Laboratory  
 Bangladesh University of Engineering and Technology (BUET)  
